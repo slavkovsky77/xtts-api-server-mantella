@@ -349,6 +349,7 @@ class TTSWrapper:
     def load_all_latents(self):
         # Total count for logging purposes
         total_latents_loaded = 0
+        total_failed = 0
 
         # Iterate over all language subdirectories in the latent speaker folder
         for language_code in os.listdir(self.latent_speaker_folder):
@@ -356,6 +357,7 @@ class TTSWrapper:
             if os.path.isdir(language_path):
                 # Initialize counter for the current language
                 current_language_latents_count = 0
+                current_language_failed_count = 0
 
                 # Load all json files within this language subfolder
                 for file_name in os.listdir(language_path):
@@ -363,16 +365,25 @@ class TTSWrapper:
                         speaker_name = file_name[:-5]  # Remove '.json' to get the speaker name
                         speaker_key = f"{speaker_name}_{language_code}"
                         file_path = os.path.join(language_path, file_name)
-                        gpt_cond_latent, speaker_embedding = self.load_latents_from_json(file_path)
-                        self.latents_cache[speaker_key] = (gpt_cond_latent, speaker_embedding)
-                        current_language_latents_count += 1
+                        try:
+                            gpt_cond_latent, speaker_embedding = self.load_latents_from_json(file_path)
+                            self.latents_cache[speaker_key] = (gpt_cond_latent, speaker_embedding)
+                            current_language_latents_count += 1
+                        except Exception as e:
+                            logger.error(f"Failed to load latents from {file_path}: {type(e).__name__}: {e}")
+                            current_language_failed_count += 1
 
                 # Log the count of loaded latents for the current language
                 logger.info(f"Loaded latents for {current_language_latents_count} speakers in '{language_code}' subfolder.")
+                if current_language_failed_count > 0:
+                    logger.warning(f"Failed to load {current_language_failed_count} speakers in '{language_code}' subfolder.")
                 total_latents_loaded += current_language_latents_count
+                total_failed += current_language_failed_count
 
         # Optionally, log the total count of latents loaded across all languages
         logger.info(f"Total latents loaded across all languages: {total_latents_loaded}")
+        if total_failed > 0:
+            logger.warning(f"Total latents failed to load across all languages: {total_failed}")
 
     # DIRICTORIES FUNCS
     def create_directories(self):
